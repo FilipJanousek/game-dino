@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="cs">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dino</title>
+    <style>
+      body {
+        margin: 0;
+        background-color: #f0f0f0;
+      }
+      .controller {
+        margin-top: 20px;
+        position: relative;
+        display: flex;
+        flex-direction: row;
+        justify-content: center;
+      }
+      .container {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        width: 400px;
+        height: 500px;
+      }
+      .controller button {
+        border-radius: 20px;
+        margin: 0 10px;
+        padding: 8px 15px;
+        font-size: 14px;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <canvas id="game" class="canvas" width="500" height="500"></canvas>
+      <div id="controller" class="controller">
+        <button id="jump" style="display: none;">Jump</button>
+        <button id="start">Start</button>
+      </div>
+    </div>
+    <script>
+      const animationInterval = 60;
+      const canvas = document.getElementById("game");
+      const ctx = canvas.getContext("2d");
+
+      const walkFrames = loadFrames("images/walk", "walk", 10);
+      const jumpFrames = loadFrames("images/jump", "jump", 10);
+      const idleFrames = loadFrames("images/idle", "idle", 10);
+
+      const jumpButton = document.getElementById("jump");
+      const startButton = document.getElementById("start");
+      const debugHitboxes = false;
+      const gravity = 0.6;
+      const jumpPower = -18;
+      const groundY = 275;
+
+      const dino = {
+        x: 15,
+        y: groundY,
+        velocityY: 0,
+        width: 490,
+        height: 242,
+      };
+
+      const dinoHitboxes = {
+        idle: {
+          offsetX: 70,
+          offsetY: 155,
+          width: 140,
+          height: 155,
+        },
+        walk: {
+          offsetX: 130,
+          offsetY: 105,
+          width: 90,
+          height: 120,
+        },
+        run: {
+          offsetX: 70,
+          offsetY: 175,
+          width: 150,
+          height: 155,
+        },
+        jump: {
+          offsetX: 70,
+          offsetY: 140,
+          width: 220,
+          height: 60,
+        },
+      };
+
+      const obstacleImage = new Image();
+      obstacleImage.src = "images/obstacles/poop.png";
+
+      const obstacle = {
+        type: "poop",
+        x: canvas.width + 80,
+        y: 450,
+        width: 50,
+        height: 50,
+        speed: 4,
+      };
+
+      let currentFrame = 0;
+      let animationTimer = 0;
+      let lastTime = 0;
+      let isIdle = true;
+      let isWalking = false;
+      let isJumping = false;
+      let gameOver = false;
+      let start = false;
+
+      function drawCharacter(image, x, y, width = canvas.width, height = canvas.height) {
+        if (!image.complete) {
+          return;
+        }
+
+        ctx.drawImage(image, x, y, width, height);
+      }
+
+      function loadFrames(path, filePrefix, count) {
+        return Array.from({ length: count }, (_, i) => {
+          const img = new Image();
+          img.src = `${path}/${filePrefix}${i + 1}.png`;
+          return img;
+        });
+      }
+
+
+
+      function doStart() {
+        if (start) {
+          return;
+        }
+
+        start = true;
+        isIdle = false;
+        doWalk();
+      }
+
+      function doWalk() {
+        resetCharacterState();
+        isWalking = true;
+      }
+
+      function doJump() {
+        if (gameOver) {
+          restartGame();
+          return;
+        }
+
+        if (dino.y === groundY) {
+          resetCharacterState();
+          isJumping = true;
+          dino.velocityY = jumpPower;
+        }
+      }
+
+
+      function resetCharacterState() {
+        resetButtons();
+        isWalking = true;
+        isJumping = false;
+        currentFrame = 0;
+        animationTimer = 0;
+      }
+
+      function resetButtons() {
+        jumpButton.classList.remove("active");
+      }
+
+      function restartGame() {
+        gameOver = false;
+        start = false;
+        obstacle.x = canvas.width + 80;
+        dino.y = groundY;
+        dino.velocityY = 0;
+        doWalk();
+      }
+
+
+      startButton.addEventListener("click", function () {
+        restartGame();
+        doStart();
+        startButton.style.display = "none";
+        jumpButton.style.display = "inline-block";
+      });
+
+      jumpButton.addEventListener("click", function () {
+        doJump();
+      });
+
+      function getCurrentState() {
+        if (isJumping) {
+          return "jump";
+        }
+
+        if (isIdle) {
+          return "idle";
+        }
+
+        return "walk";
+      }
+
+      function getCurrentFrames() {
+        const state = getCurrentState();
+
+        if (state === "jump") {
+          return jumpFrames;
+        }
+
+        if (state === "idle") {
+          return idleFrames; 
+        }
+
+        return walkFrames;
+      }
+
+      function updateAnimation(deltaTime, frames) {
+        animationTimer += deltaTime;
+
+        if (animationTimer >= animationInterval) {
+          currentFrame++;
+
+          if (currentFrame >= frames.length) {
+            currentFrame = 0;
+          }
+
+          animationTimer = 0;
+        }
+      }
+
+      function updateJump() {
+        if (!isJumping) {
+          return;
+        }
+
+        dino.y += dino.velocityY;
+        dino.velocityY += gravity;
+
+        if (dino.y >= groundY) {
+          dino.y = groundY;
+          dino.velocityY = 0;
+          doWalk();
+        }
+      }
+
+      function updateObstacle() {
+        obstacle.x -= obstacle.speed;
+
+        if (obstacle.x + obstacle.width < 0) {
+          obstacle.x = canvas.width + RandomInt(100, 450);
+        }
+      }
+
+      function RandomInt(min, max) {
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+      }
+
+      function getDinoHitbox() {
+        const hitbox = dinoHitboxes[getCurrentState()];
+
+        return {
+          x: dino.x + hitbox.offsetX,
+          y: dino.y + hitbox.offsetY,
+          width: hitbox.width,
+          height: hitbox.height,
+        };
+      }
+
+      function getObstacleHitbox() {
+
+        if(obstacle.type === "poop") {
+          return {
+            x: obstacle.x + 10,
+            y: obstacle.y + 20,
+            width: 25,
+            height: 25,
+          };
+        }
+
+        return {
+          x: obstacle.x,
+          y: obstacle.y,
+          width: obstacle.width,
+          height: obstacle.height,
+        };
+      }
+
+      function isColliding(a, b) {
+        return (
+          a.x < b.x + b.width &&
+          a.x + a.width > b.x &&
+          a.y < b.y + b.height &&
+          a.y + a.height > b.y
+        );
+      }
+
+      function drawObstacle() {
+        ctx.drawImage(obstacleImage, obstacle.x, obstacle.y, obstacle.width, obstacle.height);
+      }
+
+      function drawHitbox(box, color) {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(box.x, box.y, box.width, box.height);
+      }
+
+      function drawGameOver() {
+        ctx.fillStyle = "#000";
+        ctx.font = "32px sans-serif";
+        ctx.fillText("GAME OVER", 155, 185);
+        startButton.style.display = "inline-block";
+        jumpButton.style.display = "none";
+
+      }
+
+      function draw(currentTime = 0) {
+        const deltaTime = currentTime - lastTime;
+        lastTime = currentTime;
+
+        const frames = getCurrentFrames();
+
+        if (!gameOver && start) {
+          updateAnimation(deltaTime, frames);
+          updateJump();
+          updateObstacle();
+        } else if (gameOver) {
+          
+        } else {
+          isIdle = true;
+          updateAnimation(deltaTime, frames);
+        }
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        drawObstacle();
+        drawCharacter(frames[currentFrame], dino.x, dino.y, dino.width, dino.height);
+
+        const dinoBox = getDinoHitbox();
+        const obstacleBox = getObstacleHitbox();
+
+        if (!gameOver && isColliding(dinoBox, obstacleBox)) {
+          gameOver = true;
+        }
+
+        if (debugHitboxes) {
+          drawHitbox(obstacleBox, "blue");
+          drawHitbox(dinoBox, "red");
+          
+        }
+
+        if (gameOver) {
+          drawGameOver();
+        }
+
+        requestAnimationFrame(draw);
+      }
+
+      requestAnimationFrame(draw);
+    </script>
+  </body>
+</html>

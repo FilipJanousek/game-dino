@@ -11,10 +11,9 @@
       }
       .controller {
         margin-top: 20px;
-        position: relative;
         display: flex;
-        flex-direction: row;
-        justify-content: center;
+        flex-direction: column;
+        align-items: center;
       }
       .container {
         display: flex;
@@ -24,20 +23,24 @@
         height: 500px;
       }
       .controller button {
+        background-color: #dddddd;
         border-radius: 20px;
-        margin: 0 10px;
+        margin: 10px 0;
         padding: 8px 15px;
         font-size: 14px;
         cursor: pointer;
+        width: 120px;
       }
     </style>
   </head>
   <body>
     <div class="container">
       <canvas id="game" class="canvas" width="500" height="500"></canvas>
-      <div id="controller" class="controller">
-        <button id="jump" style="display: none;">Jump</button>
+    </div>
+    <div class="">
+      <div class="controller">
         <button id="start">Start</button>
+        <button id="jump" style="display: none">Jump</button>
       </div>
     </div>
     <script>
@@ -48,11 +51,12 @@
       const walkFrames = loadFrames("images/walk", "walk", 10);
       const jumpFrames = loadFrames("images/jump", "jump", 10);
       const idleFrames = loadFrames("images/idle", "idle", 10);
+      const deathFrames = loadFrames("images/death", "walk", 10);
 
       const jumpButton = document.getElementById("jump");
       const startButton = document.getElementById("start");
       const debugHitboxes = false;
-      const gravity = 0.6;
+      const gravity = 0.7;
       const jumpPower = -18;
       const groundY = 275;
 
@@ -111,8 +115,15 @@
       let isJumping = false;
       let gameOver = false;
       let start = false;
+      let score = 0;
 
-      function drawCharacter(image, x, y, width = canvas.width, height = canvas.height) {
+      function drawCharacter(
+        image,
+        x,
+        y,
+        width = canvas.width,
+        height = canvas.height,
+      ) {
         if (!image.complete) {
           return;
         }
@@ -128,13 +139,7 @@
         });
       }
 
-
-
       function doStart() {
-        if (start) {
-          return;
-        }
-
         start = true;
         isIdle = false;
         doWalk();
@@ -158,7 +163,6 @@
         }
       }
 
-
       function resetCharacterState() {
         resetButtons();
         isWalking = true;
@@ -177,9 +181,9 @@
         obstacle.x = canvas.width + 80;
         dino.y = groundY;
         dino.velocityY = 0;
+        resetScore();
         doWalk();
       }
-
 
       startButton.addEventListener("click", function () {
         restartGame();
@@ -212,7 +216,7 @@
         }
 
         if (state === "idle") {
-          return idleFrames; 
+          return idleFrames;
         }
 
         return walkFrames;
@@ -271,8 +275,7 @@
       }
 
       function getObstacleHitbox() {
-
-        if(obstacle.type === "poop") {
+        if (obstacle.type === "poop") {
           return {
             x: obstacle.x + 10,
             y: obstacle.y + 20,
@@ -299,7 +302,13 @@
       }
 
       function drawObstacle() {
-        ctx.drawImage(obstacleImage, obstacle.x, obstacle.y, obstacle.width, obstacle.height);
+        ctx.drawImage(
+          obstacleImage,
+          obstacle.x,
+          obstacle.y,
+          obstacle.width,
+          obstacle.height,
+        );
       }
 
       function drawHitbox(box, color) {
@@ -309,12 +318,39 @@
       }
 
       function drawGameOver() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.fillStyle = "#000";
         ctx.font = "32px sans-serif";
         ctx.fillText("GAME OVER", 155, 185);
+        // draw final score
+        ctx.font = "20px sans-serif";
+        ctx.fillText(`Score: ${score}`, 200, 220);
+        
         startButton.style.display = "inline-block";
         jumpButton.style.display = "none";
 
+        //get index from currentImage and use it to get death image
+        const deathImage = deathFrames[currentFrame];
+
+        drawObstacle();
+        drawCharacter(deathImage, dino.x, dino.y, dino.width, dino.height);
+      }
+
+      function drawScore() {
+        ctx.fillStyle = "#000";
+        ctx.font = "20px sans-serif";
+        ctx.fillText(`Score: ${score}`, 350, 30);
+      }
+
+      function updateScore(deltaTime) {
+        if (!gameOver && start) {
+          let deltaTimeInt = parseInt(deltaTime / 10);
+          score += deltaTimeInt;
+        }
+      }
+
+      function resetScore() {
+        score = 0;
       }
 
       function draw(currentTime = 0) {
@@ -323,36 +359,44 @@
 
         const frames = getCurrentFrames();
 
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        drawObstacle();
+        drawCharacter(
+          frames[currentFrame],
+          dino.x,
+          dino.y,
+          dino.width,
+          dino.height,
+        );
+        drawScore();
+
         if (!gameOver && start) {
           updateAnimation(deltaTime, frames);
           updateJump();
           updateObstacle();
-        } else if (gameOver) {
-          
+          updateScore(deltaTime);
+        } else if(gameOver) {
+          const deathImage = deathFrames[currentFrame];
+          drawGameOver();
         } else {
           isIdle = true;
           updateAnimation(deltaTime, frames);
         }
 
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        drawObstacle();
-        drawCharacter(frames[currentFrame], dino.x, dino.y, dino.width, dino.height);
+        
 
         const dinoBox = getDinoHitbox();
         const obstacleBox = getObstacleHitbox();
 
         if (!gameOver && isColliding(dinoBox, obstacleBox)) {
           gameOver = true;
+          start = false;
+          drawGameOver();
         }
 
         if (debugHitboxes) {
           drawHitbox(obstacleBox, "blue");
           drawHitbox(dinoBox, "red");
-          
-        }
-
-        if (gameOver) {
-          drawGameOver();
         }
 
         requestAnimationFrame(draw);

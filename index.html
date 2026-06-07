@@ -75,15 +75,15 @@
         isJumping = false;
         isDead = false;
         jumpPower = -15;
-        groundY = 275;
+        groundY = 365;
         gravity = 0.7;
         currentFrame = 0;
         animationTimer = 0;
         velocityY = 1;
         hitboxes = {
           idle: { offsetX: 70, offsetY: 155, width: 140, height: 155 },
-          walk: { offsetX: 130, offsetY: 105, width: 90, height: 120 },
-          jump: { offsetX: 70, offsetY: 140, width: 220, height: 60 },
+          walk: { offsetX: 30, offsetY: 5, width: 90, height: 120 },
+          jump: { offsetX: 30, offsetY: 50, width: 120, height: 60 },
         };
 
         constructor(x, y, width, height) {
@@ -212,9 +212,9 @@
           );
           this.player = new Player(
             15,
-            275,
-            490,
-            242,
+            365,
+            290,
+            142,
           );
 
           this.init();

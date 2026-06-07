@@ -14,6 +14,7 @@
         display: flex;
         flex-direction: column;
         align-items: center;
+        width: 400px;
       }
       .container {
         display: flex;
@@ -56,80 +57,9 @@
       const jumpButton = document.getElementById("jump");
       const startButton = document.getElementById("start");
       const debugHitboxes = false;
-      const gravity = 0.7;
-      const jumpPower = -18;
-      const groundY = 275;
-
-      const dino = {
-        x: 15,
-        y: groundY,
-        velocityY: 0,
-        width: 490,
-        height: 242,
-      };
-
-      const dinoHitboxes = {
-        idle: {
-          offsetX: 70,
-          offsetY: 155,
-          width: 140,
-          height: 155,
-        },
-        walk: {
-          offsetX: 130,
-          offsetY: 105,
-          width: 90,
-          height: 120,
-        },
-        run: {
-          offsetX: 70,
-          offsetY: 175,
-          width: 150,
-          height: 155,
-        },
-        jump: {
-          offsetX: 70,
-          offsetY: 140,
-          width: 220,
-          height: 60,
-        },
-      };
 
       const obstacleImage = new Image();
       obstacleImage.src = "images/obstacles/poop.png";
-
-      const obstacle = {
-        type: "poop",
-        x: canvas.width + 80,
-        y: 450,
-        width: 50,
-        height: 50,
-        speed: 4,
-      };
-
-      let currentFrame = 0;
-      let animationTimer = 0;
-      let lastTime = 0;
-      let isIdle = true;
-      let isWalking = false;
-      let isJumping = false;
-      let gameOver = false;
-      let start = false;
-      let score = 0;
-
-      function drawCharacter(
-        image,
-        x,
-        y,
-        width = canvas.width,
-        height = canvas.height,
-      ) {
-        if (!image.complete) {
-          return;
-        }
-
-        ctx.drawImage(image, x, y, width, height);
-      }
 
       function loadFrames(path, filePrefix, count) {
         return Array.from({ length: count }, (_, i) => {
@@ -139,270 +69,352 @@
         });
       }
 
-      function doStart() {
-        start = true;
-        isIdle = false;
-        doWalk();
-      }
-
-      function doWalk() {
-        resetCharacterState();
-        isWalking = true;
-      }
-
-      function doJump() {
-        if (gameOver) {
-          restartGame();
-          return;
-        }
-
-        if (dino.y === groundY) {
-          resetCharacterState();
-          isJumping = true;
-          dino.velocityY = jumpPower;
-        }
-      }
-
-      function resetCharacterState() {
-        resetButtons();
-        isWalking = true;
+      class Player {
+        isIdle = true;
+        isWalking = false;
         isJumping = false;
+        isDead = false;
+        jumpPower = -15;
+        groundY = 275;
+        gravity = 0.7;
         currentFrame = 0;
         animationTimer = 0;
-      }
+        velocityY = 1;
+        hitboxes = {
+          idle: { offsetX: 70, offsetY: 155, width: 140, height: 155 },
+          walk: { offsetX: 130, offsetY: 105, width: 90, height: 120 },
+          jump: { offsetX: 70, offsetY: 140, width: 220, height: 60 },
+        };
 
-      function resetButtons() {
-        jumpButton.classList.remove("active");
-      }
-
-      function restartGame() {
-        gameOver = false;
-        start = false;
-        obstacle.x = canvas.width + 80;
-        dino.y = groundY;
-        dino.velocityY = 0;
-        resetScore();
-        doWalk();
-      }
-
-      startButton.addEventListener("click", function () {
-        restartGame();
-        doStart();
-        startButton.style.display = "none";
-        jumpButton.style.display = "inline-block";
-      });
-
-      jumpButton.addEventListener("click", function () {
-        doJump();
-      });
-
-      function getCurrentState() {
-        if (isJumping) {
-          return "jump";
+        constructor(x, y, width, height) {
+          this.x = x;
+          this.y = y;
+          this.width = width;
+          this.height = height;
         }
 
-        if (isIdle) {
-          return "idle";
+        draw(ctx, deltaTime) { 
+          if(this.isIdle) {
+            const image = idleFrames[this.currentFrame];
+            ctx.drawImage(image, this.x, this.y, this.width, this.height);
+            this.updateCurrentFrame(deltaTime, this.getCurrentFrames());
+          } else if (this.isWalking) {
+            const image = walkFrames[this.currentFrame];
+            ctx.drawImage(image, this.x, this.y, this.width, this.height);
+            this.updateCurrentFrame(deltaTime, this.getCurrentFrames());
+          } else if (this.isJumping) {
+            this.doJump();
+            const image = jumpFrames[this.currentFrame];
+            ctx.drawImage(image, this.x, this.y, this.width, this.height);
+            this.updateCurrentFrame(deltaTime, this.getCurrentFrames());
+          } else if (this.isDead) {
+            const image = deathFrames[this.currentFrame];
+            ctx.drawImage(image, this.x, this.y, this.width, this.height);
+            this.updateCurrentFrame(deltaTime, deathFrames);
+          }
         }
 
-        return "walk";
-      }
+        updateCurrentFrame(deltaTime, frames) {
+          this.animationTimer += deltaTime;
+          
+          if (this.animationTimer >= 0.06) {
+            this.currentFrame++;
 
-      function getCurrentFrames() {
-        const state = getCurrentState();
+            if (this.currentFrame >= frames.length) {
+              this.currentFrame = 0;
+            }
 
-        if (state === "jump") {
-          return jumpFrames;
+            this.animationTimer = 0;
+          }
         }
 
-        if (state === "idle") {
-          return idleFrames;
-        }
-
-        return walkFrames;
-      }
-
-      function updateAnimation(deltaTime, frames) {
-        animationTimer += deltaTime;
-
-        if (animationTimer >= animationInterval) {
-          currentFrame++;
-
-          if (currentFrame >= frames.length) {
-            currentFrame = 0;
+        update(deltaTime) {          
+          if (!this.isJumping) {
+            return;
           }
 
-          animationTimer = 0;
+          this.velocityY += this.gravity * (deltaTime * 50);
+          this.y += this.velocityY * (deltaTime * 50);
+
+          if (this.y >= this.groundY) {
+            this.y = this.groundY;
+            this.velocityY = 0;
+            this.isWalking = true;
+            this.isJumping = false;
+          }
         }
-      }
 
-      function updateJump() {
-        if (!isJumping) {
-          return;
+        getCurrentState() {
+          if (this.isJumping) {
+            return "jump";
+          }
+
+          if (this.isIdle) {
+            return "idle";
+          }
+
+          return "walk";
         }
 
-        dino.y += dino.velocityY;
-        dino.velocityY += gravity;
+        getCurrentFrames() {
+          const state = this.getCurrentState();
 
-        if (dino.y >= groundY) {
-          dino.y = groundY;
-          dino.velocityY = 0;
-          doWalk();
+          if (state === "jump") {
+            return jumpFrames;
+          }
+
+          if (state === "idle") {
+            return idleFrames;
+          }
+
+          return walkFrames;
         }
-      }
 
-      function updateObstacle() {
-        obstacle.x -= obstacle.speed;
 
-        if (obstacle.x + obstacle.width < 0) {
-          obstacle.x = canvas.width + RandomInt(100, 450);
-        }
-      }
+        getHitbox() {
+          const hitbox = this.hitboxes[this.getCurrentState()];
 
-      function RandomInt(min, max) {
-        return Math.floor(Math.random() * (max - min + 1)) + min;
-      }
-
-      function getDinoHitbox() {
-        const hitbox = dinoHitboxes[getCurrentState()];
-
-        return {
-          x: dino.x + hitbox.offsetX,
-          y: dino.y + hitbox.offsetY,
-          width: hitbox.width,
-          height: hitbox.height,
-        };
-      }
-
-      function getObstacleHitbox() {
-        if (obstacle.type === "poop") {
           return {
-            x: obstacle.x + 10,
-            y: obstacle.y + 20,
-            width: 25,
-            height: 25,
+            x: this.x + hitbox.offsetX,
+            y: this.y + hitbox.offsetY,
+            width: hitbox.width,
+            height: hitbox.height,
           };
         }
 
-        return {
-          x: obstacle.x,
-          y: obstacle.y,
-          width: obstacle.width,
-          height: obstacle.height,
-        };
-      }
+        doJump() {
+          if (this.isJumping) {
+            return;
+          }
 
-      function isColliding(a, b) {
-        return (
-          a.x < b.x + b.width &&
-          a.x + a.width > b.x &&
-          a.y < b.y + b.height &&
-          a.y + a.height > b.y
-        );
-      }
+          this.isWalking = false;
+          this.isJumping = true;
+          this.velocityY = this.jumpPower;
+        }
+       }
 
-      function drawObstacle() {
-        ctx.drawImage(
-          obstacleImage,
-          obstacle.x,
-          obstacle.y,
-          obstacle.width,
-          obstacle.height,
-        );
-      }
+      class BaseGame {
+        constructor() {
+          this.canvas = document.getElementById("game");
+          this.ctx = this.canvas.getContext("2d");
+          this.states = {start: false, gameOver: false};
+          this.lastTime = null;
+          this.score = new Score();
+          this.obstacle = new Obstacle(
+            "poop",
+            canvas.width + 80,
+            450,
+            50,
+            50,
+            400,
+            obstacleImage,
+            canvas,
+          );
+          this.player = new Player(
+            15,
+            275,
+            490,
+            242,
+          );
 
-      function drawHitbox(box, color) {
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 2;
-        ctx.strokeRect(box.x, box.y, box.width, box.height);
-      }
+          this.init();
+        }
 
-      function drawGameOver() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = "#000";
-        ctx.font = "32px sans-serif";
-        ctx.fillText("GAME OVER", 155, 185);
-        // draw final score
-        ctx.font = "20px sans-serif";
-        ctx.fillText(`Score: ${score}`, 200, 220);
-        
-        startButton.style.display = "inline-block";
-        jumpButton.style.display = "none";
+        init() {
+          startButton.addEventListener("click", () => {
+            startButton.style.display = "none";
+            jumpButton.style.display = "inline-block";
+            this.restartGame();
+          });
 
-        //get index from currentImage and use it to get death image
-        const deathImage = deathFrames[currentFrame];
+          jumpButton.addEventListener("click", () => {
+            if (!this.states.gameOver) {
+              this.player.doJump();
+            }
+          });
+        }
 
-        drawObstacle();
-        drawCharacter(deathImage, dino.x, dino.y, dino.width, dino.height);
-      }
+        restartGame() {
+          this.states.gameOver = false;
+          this.states.start = true;
+          this.obstacle.x = this.canvas.width + 80;
+          this.player.y = this.player.groundY;
+          this.player.velocityY = 0;
+          this.player.isWalking = true;
+          this.player.isJumping = false;
+          this.player.isIdle = false;
+          this.player.currentFrame = 0;
+          this.player.animationTimer = 0;
+          this.score.reset();
+        }
 
-      function drawScore() {
-        ctx.fillStyle = "#000";
-        ctx.font = "20px sans-serif";
-        ctx.fillText(`Score: ${score}`, 350, 30);
-      }
+        drawGameOver() {
+          startButton.style.display = "inline-block";
+          jumpButton.style.display = "none";
+          this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+          this.ctx.fillStyle = "#000";
+          this.ctx.font = "32px sans-serif";
+          this.ctx.fillText("GAME OVER", 155, 185);
+          // draw final score
+          this.ctx.font = "20px sans-serif";
+          this.ctx.fillText(`Score: ${this.score.getScore()}`, 200, 220);
 
-      function updateScore(deltaTime) {
-        if (!gameOver && start) {
-          let deltaTimeInt = parseInt(deltaTime / 10);
-          score += deltaTimeInt;
+          
+
+          const deathImage = deathFrames[this.player.currentFrame];
+
+          this.obstacle.draw(this.ctx);
+          this.player.isWalking = false;
+          this.player.isDead = true;
+          this.player.draw(this.ctx, deathImage);
+        }
+
+        isColliding(a, b) {
+          return (
+            a.x < b.x + b.width &&
+            a.x + a.width > b.x &&
+            a.y < b.y + b.height &&
+            a.y + a.height > b.y
+          );
+        }
+
+        collisionDetection() {
+          const dinoBox = this.player.getHitbox();
+          const obstacleBox = this.obstacle.getHitbox();
+
+          if (!this.states.gameOver && this.isColliding(dinoBox, obstacleBox)) {
+            this.states.gameOver = true;
+            this.states.start = false;
+            this.drawGameOver();
+          }
+
+          if (debugHitboxes) {
+            this.drawHitbox(obstacleBox, "blue");
+            this.drawHitbox(dinoBox, "red");
+          }
+        }
+
+        drawHitbox(box, color) {
+          this.ctx.strokeStyle = color;
+          this.ctx.lineWidth = 2;
+          this.ctx.strokeRect(box.x, box.y, box.width, box.height);
+        }
+
+        play(currentTime = 0) {
+          if (this.lastTime === null) {
+            this.lastTime = currentTime;
+          }
+
+          const deltaTime = (currentTime - this.lastTime) / 1000;
+          this.lastTime = currentTime;
+
+          this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+          if (this.states.start && !this.states.gameOver) {
+
+            this.collisionDetection();
+
+            this.score.draw(this.ctx);
+            this.score.update(
+              deltaTime,
+              this.states.gameOver,
+              this.states.start,
+            );
+
+            // Update and draw obstacle
+            this.obstacle.draw(this.ctx);
+            this.obstacle.update(deltaTime);
+
+            // Update and draw player
+            this.player.draw(this.ctx, deltaTime);
+            this.player.update(deltaTime);
+
+          } else if (this.states.gameOver) {
+            this.drawGameOver();
+          } else if (!this.states.start && !this.states.gameOver) {
+            this.player.isIdle = true;
+            this.player.draw(this.ctx, deltaTime);
+          }
+
+          this.run();
+        }
+
+        run() {
+          requestAnimationFrame(this.play.bind(this));
         }
       }
 
-      function resetScore() {
-        score = 0;
+     
+
+      class Score {
+        constructor() {
+          this.score = 0;
+          this.points = 10;
+        }
+
+        draw(ctx) {
+          ctx.fillStyle = "#000";
+          ctx.font = "20px sans-serif";
+          ctx.fillText(`Score: ${Math.floor(this.score)}`, 340, 30);
+        }
+
+        getScore() {
+          return Math.floor(this.score);
+        }
+
+        update(deltaTime) {
+          this.score += this.points * deltaTime;
+        }
+
+        reset() {
+          this.score = 0;
+        }
       }
 
-      function draw(currentTime = 0) {
-        const deltaTime = currentTime - lastTime;
-        lastTime = currentTime;
-
-        const frames = getCurrentFrames();
-
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        drawObstacle();
-        drawCharacter(
-          frames[currentFrame],
-          dino.x,
-          dino.y,
-          dino.width,
-          dino.height,
-        );
-        drawScore();
-
-        if (!gameOver && start) {
-          updateAnimation(deltaTime, frames);
-          updateJump();
-          updateObstacle();
-          updateScore(deltaTime);
-        } else if(gameOver) {
-          const deathImage = deathFrames[currentFrame];
-          drawGameOver();
-        } else {
-          isIdle = true;
-          updateAnimation(deltaTime, frames);
+      class Obstacle {
+        constructor(type, x, y, width, height, speed, img, canvas) {
+          this.type = type;
+          this.x = x;
+          this.y = y;
+          this.width = width;
+          this.height = height;
+          this.img = img;
+          this.speed = speed;
+          this.canvas = canvas;
         }
 
-        
-
-        const dinoBox = getDinoHitbox();
-        const obstacleBox = getObstacleHitbox();
-
-        if (!gameOver && isColliding(dinoBox, obstacleBox)) {
-          gameOver = true;
-          start = false;
-          drawGameOver();
+        draw(ctx) {
+          ctx.drawImage(this.img, this.x, this.y, this.width, this.height);
         }
 
-        if (debugHitboxes) {
-          drawHitbox(obstacleBox, "blue");
-          drawHitbox(dinoBox, "red");
+        update(deltaTime) {
+          this.x -= this.speed * deltaTime;
+          if (this.x + this.width < 0) {
+            this.x = this.canvas.width + Math.floor(Math.random() * (450 - 100 + 1)) + 100;
+          }
         }
 
-        requestAnimationFrame(draw);
+        getHitbox() {
+          if (this.type === "poop") {
+            return {
+              x: this.x + 10,
+              y: this.y + 20,
+              width: 25,
+              height: 25,
+            };
+          }
+
+          return {
+            x: this.x,
+            y: this.y,
+            width: this.width,
+            height: this.height,
+          };
+        }
       }
 
-      requestAnimationFrame(draw);
+      const DinoGame = new BaseGame();
+      DinoGame.run();
     </script>
   </body>
 </html>

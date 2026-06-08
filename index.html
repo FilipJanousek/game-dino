@@ -59,7 +59,10 @@
       const debugHitboxes = false;
 
       const obstacleImage = new Image();
-      obstacleImage.src = "images/obstacles/poop.png";
+      obstacleImage.src = "images/obstacles/poop2.png";
+
+      const groundImage = new Image();
+      groundImage.src = "images/ground/ground-bg2.png";
 
       function loadFrames(path, filePrefix, count) {
         return Array.from({ length: count }, (_, i) => {
@@ -69,13 +72,38 @@
         });
       }
 
+      class Ground {
+        constructor(x, y, width, height, speed, img, canvas) {
+          this.x = x;
+          this.y = y;
+          this.width = width;
+          this.height = height;
+          this.img = img;
+          this.speed = speed;
+          this.canvas = canvas;
+        }
+
+        draw(ctx) {
+          for (let i = -1; i <= 1; i++) {
+            ctx.drawImage(this.img, this.x + i * this.width, this.y, this.width, this.height);
+          }
+        }
+
+        update(deltaTime) {
+          this.x -= this.speed * deltaTime;
+          if (this.x + this.width < 0) {
+            this.x = this.canvas.width;
+          }
+        }
+      }
+
       class Player {
         isIdle = true;
         isWalking = false;
         isJumping = false;
         isDead = false;
         jumpPower = -12;
-        groundY = 365;
+        groundY = 230;
         gravity = 0.7;
         currentFrame = 0;
         animationTimer = 0;
@@ -200,20 +228,22 @@
           this.ctx = this.canvas.getContext("2d");
           this.states = {start: false, gameOver: false};
           this.lastTime = null;
+          this.background = new Background(this.canvas);
+          this.ground = new Ground(500, 300, 500, 200, 400, groundImage, this.canvas);
           this.score = new Score();
           this.obstacle = new Obstacle(
             "poop",
-            canvas.width + 80,
-            450,
+            this.canvas.width + 80,
+            310,
             50,
             50,
             400,
             obstacleImage,
-            canvas,
+            this.canvas,
           );
           this.player = new Player(
             15,
-            365,
+            230,
             290,
             142,
           );
@@ -253,6 +283,7 @@
           startButton.style.display = "inline-block";
           jumpButton.style.display = "none";
           this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+          this.background.draw(this.ctx);
           this.ctx.fillStyle = "#000";
           this.ctx.font = "32px sans-serif";
           this.ctx.fillText("GAME OVER", 155, 185);
@@ -262,6 +293,8 @@
 
           const deathImage = deathFrames[this.player.currentFrame];
 
+          
+          this.ground.draw(this.ctx);
           this.obstacle.draw(this.ctx);
           this.player.isWalking = false;
           this.player.isDead = true;
@@ -313,6 +346,7 @@
 
             this.collisionDetection();
 
+            this.background.draw(this.ctx);
             this.score.draw(this.ctx);
             this.score.update(
               deltaTime,
@@ -320,6 +354,10 @@
               this.states.start,
             );
 
+            this.ground.draw(this.ctx);
+            this.ground.update(deltaTime);
+
+          
             // Update and draw obstacle
             this.obstacle.draw(this.ctx);
             this.obstacle.update(deltaTime);
@@ -332,7 +370,10 @@
             this.drawGameOver();
           } else if (!this.states.start && !this.states.gameOver) {
             this.player.isIdle = true;
+            this.background.draw(this.ctx);
+            this.ground.draw(this.ctx);
             this.player.draw(this.ctx, deltaTime);
+            
           }
 
           this.run();
@@ -367,6 +408,21 @@
 
         reset() {
           this.score = 0;
+        }
+      }
+
+      class Background {
+        constructor(canvas) {
+          this.canvas = canvas;
+        }
+
+        draw(ctx) {
+          // draw blue sky && blur effect
+
+          ctx.fillStyle = "#87CEEB";
+          ctx.filter = "blur(5px)";
+          ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+          ctx.filter = "none";
         }
       }
 

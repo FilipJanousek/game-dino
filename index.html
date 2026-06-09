@@ -222,6 +222,7 @@
           this.isWalking = false;
           this.isJumping = true;
           this.velocityY = this.jumpPower;
+          jumpSound.currentTime = 0;
           jumpSound.play();
         }
        }
@@ -257,6 +258,10 @@
 
         init() {
           startButton.addEventListener("click", () => {
+            songSound.currentTime = 0;
+            songSound.volume = 0.5;
+            songSound.loop = true;
+            songSound.play();
             // stop sound if playing
             laughterSound.pause();
             laughterSound.currentTime = 0;
@@ -326,6 +331,7 @@
             this.states.gameOver = true;
             this.states.start = false;
             this.drawGameOver();
+            songSound.pause();
             fartSound.play();
             setTimeout(() => {
               laughterSound.play();

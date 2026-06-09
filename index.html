@@ -222,7 +222,6 @@
           this.isWalking = false;
           this.isJumping = true;
           this.velocityY = this.jumpPower;
-          jumpSound.currentTime = 0.2;
           jumpSound.play();
         }
        }
@@ -327,10 +326,8 @@
             this.states.gameOver = true;
             this.states.start = false;
             this.drawGameOver();
-            fartSound.currentTime = 0.4;
             fartSound.play();
             setTimeout(() => {
-              laughterSound.currentTime = 0;
               laughterSound.play();
             }, 300);
           }

@@ -19,7 +19,6 @@
       .container {
         display: flex;
         flex-direction: column;
-        justify-content: center;
         width: 400px;
         height: 500px;
       }
@@ -49,20 +48,25 @@
       const canvas = document.getElementById("game");
       const ctx = canvas.getContext("2d");
 
-      const walkFrames = loadFrames("images/walk", "walk", 10);
-      const jumpFrames = loadFrames("images/jump", "jump", 10);
-      const idleFrames = loadFrames("images/idle", "idle", 10);
-      const deathFrames = loadFrames("images/death", "walk", 10);
+      const walkFrames = loadFrames("assets/images/walk", "walk", 10);
+      const jumpFrames = loadFrames("assets/images/jump", "jump", 10);
+      const idleFrames = loadFrames("assets/images/idle", "idle", 10);
+      const deathFrames = loadFrames("assets/images/death", "walk", 10);
+
+      const fartSound = new Audio("assets/sounds/fart.mp3");
+      const jumpSound = new Audio("assets/sounds/jump.mp3");
+      const laughterSound = new Audio("assets/sounds/laught.mp3");
+      const songSound = new Audio("assets/sounds/song.mp3");
 
       const jumpButton = document.getElementById("jump");
       const startButton = document.getElementById("start");
       const debugHitboxes = false;
 
       const obstacleImage = new Image();
-      obstacleImage.src = "images/obstacles/poop2.png";
+      obstacleImage.src = "assets/images/obstacles/poop2.png";
 
       const groundImage = new Image();
-      groundImage.src = "images/ground/ground-bg2.png";
+      groundImage.src = "assets/images/ground/ground-bg2.png";
 
       function loadFrames(path, filePrefix, count) {
         return Array.from({ length: count }, (_, i) => {
@@ -198,7 +202,6 @@
           return walkFrames;
         }
 
-
         getHitbox() {
           const hitbox = this.hitboxes[this.getCurrentState()];
 
@@ -219,6 +222,8 @@
           this.isWalking = false;
           this.isJumping = true;
           this.velocityY = this.jumpPower;
+          jumpSound.currentTime = 0.2;
+          jumpSound.play();
         }
        }
 
@@ -253,6 +258,9 @@
 
         init() {
           startButton.addEventListener("click", () => {
+            // stop sound if playing
+            laughterSound.pause();
+            laughterSound.currentTime = 0;
             startButton.style.display = "none";
             jumpButton.style.display = "inline-block";
             this.restartGame();
@@ -263,7 +271,8 @@
               this.player.doJump();
             }
           });
-        }
+        };
+          
 
         restartGame() {
           this.states.gameOver = false;
@@ -318,6 +327,12 @@
             this.states.gameOver = true;
             this.states.start = false;
             this.drawGameOver();
+            fartSound.currentTime = 0.4;
+            fartSound.play();
+            setTimeout(() => {
+              laughterSound.currentTime = 0;
+              laughterSound.play();
+            }, 300);
           }
 
           if (debugHitboxes) {
@@ -373,7 +388,6 @@
             this.background.draw(this.ctx);
             this.ground.draw(this.ctx);
             this.player.draw(this.ctx, deltaTime);
-            
           }
 
           this.run();
